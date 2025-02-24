@@ -4,7 +4,7 @@ This is the Firebase Cloud Functions for rankyale.com: a toxic website where Yal
 
 ## Development
 
-`npm run build` and then `firebase emulators:start` to run in dev
+`npm run build` and then `firebase emulators:start --import=./dir` to run in dev
 `firebase deploy --only functions` to deploy to firebase
 
 ```bash

@@ -1,16 +1,6 @@
-// import {onCall} from "firebase-functions/v2/https";
-// import * as admin from "firebase-admin";
-// import * as logger from "firebase-functions/logger";
-
-// admin.initializeApp();
-// const db = admin.firestore();
-
-// The Cloud Functions for Firebase SDK to create Cloud Functions and triggers.
 import {logger} from "firebase-functions";
-import {onCall, onRequest} from "firebase-functions/v2/https";
-// import {onDocumentCreated} from "firebase-functions/v2/firestore";
+import {onCall} from "firebase-functions/v2/https";
 
-// The Firebase Admin SDK to access Firestore.
 import {initializeApp} from "firebase-admin/app";
 import {getFirestore} from "firebase-admin/firestore";
 

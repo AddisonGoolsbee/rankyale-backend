@@ -21,7 +21,8 @@
         "port": 5001
       },
       "firestore": {
-        "port": 8080
+        "port": 8080,
+        "import": "./emulator-data"
       }
     }
 }
