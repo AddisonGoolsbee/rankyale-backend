@@ -78,8 +78,9 @@ export const updateEloRating = onCall(async (request) => {
       throw new Error("You've already ranked this pair.");
     }
 
-    const expectedScore1 = 1 / (1 + Math.pow(10, (entry2.score - entry1.score) / 400));
-    const expectedScore2 = 1 / (1 + Math.pow(10, (entry1.score - entry2.score) / 400));
+    const randomFactor = 0.01 * (Math.random() - 0.5); // Small random factor between -0.005 and 0.005
+    const expectedScore1 = 1 / (1 + Math.pow(10, (entry2.score - entry1.score) / 400 + randomFactor));
+    const expectedScore2 = 1 / (1 + Math.pow(10, (entry1.score - entry2.score) / 400 + randomFactor));
 
     score1 = entry1.score;
     score2 = entry2.score;
