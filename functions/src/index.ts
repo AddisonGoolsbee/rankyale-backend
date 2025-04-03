@@ -29,12 +29,12 @@ export const updateEloRating = onCall(async (request) => {
   await db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
     if (!userDoc.exists) {
-      throw new Error("User not found");
+      return {message: "User not found"};
     }
 
     const userData = userDoc.data();
     if (!userData) {
-      throw new Error("User data not found");
+      return {message: "User data not found"};
     }
 
     const today = new Date().toISOString().split("T")[0];
@@ -53,20 +53,20 @@ export const updateEloRating = onCall(async (request) => {
 
     const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
     if (todaysVotes[subcategory] >= MAX_DAILY_RANKINGS) {
-      throw new Error("No votes left for this category today");
+      return {message: "No votes left for this category today"};
     }
 
     const [entry1Doc, entry2Doc] = await Promise.all([transaction.get(entry1Ref), transaction.get(entry2Ref)]);
 
     if (!entry1Doc.exists || !entry2Doc.exists) {
-      throw new Error("One or both entries not found");
+      return {message: "One or both entries not found"};
     }
 
     const entry1 = entry1Doc.data();
     const entry2 = entry2Doc.data();
 
     if (entry1 === undefined || entry2 === undefined) {
-      throw new Error("One or both entries do not have a score");
+      return {message: "One or both entries do not have a score"};
     }
 
     const [idA, idB] = [entry1Id, entry2Id].sort(); // normalize
@@ -75,7 +75,7 @@ export const updateEloRating = onCall(async (request) => {
     const voteRef = db.collection("votes").doc(voteId);
     const existingVote = await transaction.get(voteRef);
     if (existingVote.exists) {
-      throw new Error("You've already ranked this pair.");
+      return {message: "You've already ranked this pair."};
     }
 
     const randomFactor = 0.01 * (Math.random() - 0.5); // Small random factor between -0.005 and 0.005
@@ -107,9 +107,9 @@ export const updateEloRating = onCall(async (request) => {
     // Update the votes count
     todaysVotes[subcategory] += 1;
     transaction.update(userRef, {votes: userData.votes});
-  });
 
-  return {message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid};
+    return {message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid};
+  });
 });
 
 export const getUser = onCall(async (request) => {
@@ -214,14 +214,14 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
   const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
 
   if (!todaysVotes) {
-    throw new Error("No votes found for today");
+    return [];
   }
 
   const subset = request.data.subset || "All";
   const remainingVotes = MAX_DAILY_RANKINGS - (todaysVotes[subset] || 0);
 
   if (remainingVotes <= 0) {
-    throw new Error("No votes left for this category today");
+    return [];
   }
 
   const votesSnap = await db.collection("votes")
