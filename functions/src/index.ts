@@ -14,7 +14,7 @@ export const updateEloRating = onCall(async (request) => {
     throw new Error("Unauthenticated: Sign-in required");
   }
 
-  const { collectionName, entry1Id, entry2Id, mode, subcategory } = request.data;
+  const {collectionName, entry1Id, entry2Id, mode, subcategory} = request.data;
 
   if (!collectionName || !entry1Id || !entry2Id || !subcategory) {
     throw new Error("Invalid request: Missing parameters");
@@ -24,7 +24,7 @@ export const updateEloRating = onCall(async (request) => {
   const entry1Ref = db.collection("categories").doc(collectionName).collection("entries").doc(entry1Id);
   const entry2Ref = db.collection("categories").doc(collectionName).collection("entries").doc(entry2Id);
 
-  let score1, score2; // Declare score1 and score2 here
+  let score1; let score2; // Declare score1 and score2 here
 
   await db.runTransaction(async (transaction) => {
     const userDoc = await transaction.get(userRef);
@@ -37,7 +37,7 @@ export const updateEloRating = onCall(async (request) => {
       throw new Error("User data not found");
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split("T")[0];
 
     // Initialize today's votes if not present
     if (!userData.votes.some((vote: any) => vote.date === today)) {
@@ -92,8 +92,8 @@ export const updateEloRating = onCall(async (request) => {
       score2 += K * (1 - expectedScore2);
     }
 
-    transaction.update(entry1Ref, { score: score1 });
-    transaction.update(entry2Ref, { score: score2 });
+    transaction.update(entry1Ref, {score: score1});
+    transaction.update(entry2Ref, {score: score2});
 
     transaction.set(voteRef, {
       uid,
@@ -105,10 +105,10 @@ export const updateEloRating = onCall(async (request) => {
 
     // Update the votes count
     todaysVotes[subcategory] += 1;
-    transaction.update(userRef, { votes: userData.votes });
+    transaction.update(userRef, {votes: userData.votes});
   });
 
-  return { message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid };
+  return {message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid};
 });
 
 export const getUser = onCall(async (request) => {
@@ -153,9 +153,9 @@ export const getUser = onCall(async (request) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: "Bearer " + apiKey,
+      "Authorization": "Bearer " + apiKey,
     },
-    body: JSON.stringify({ filters: { email: email } }),
+    body: JSON.stringify({filters: {email: email}}),
   });
 
   if (!yaliesResponse.ok) {
@@ -167,10 +167,10 @@ export const getUser = onCall(async (request) => {
   const classYear = yaliesJSON[0].year;
 
   // Update the user's class year
-  await userRef.update({ classYear });
+  await userRef.update({classYear});
 
   // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
 
   // Initialize today's votes if not present
   if (!userData.votes.some((vote: any) => vote.date === today)) {
@@ -184,11 +184,11 @@ export const getUser = onCall(async (request) => {
     });
 
     // Persist the changes to Firestore
-    await userRef.update({ votes: userData.votes });
+    await userRef.update({votes: userData.votes});
   }
 
   const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
-  return { email, classYear, todaysVotes };
+  return {email, classYear, todaysVotes};
 });
 
 export const fetchVotesAndGeneratePairs = onCall(async (request) => {
@@ -209,7 +209,7 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
     throw new Error("User data not found");
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date().toISOString().split("T")[0];
   const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
 
   if (!todaysVotes) {
@@ -230,7 +230,7 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
 
   const seenPairs = new Set<string>();
   votesSnap.forEach((doc) => {
-    const { entryA, entryB } = doc.data();
+    const {entryA, entryB} = doc.data();
     seenPairs.add(`${entryA}_${entryB}`);
   });
 
@@ -239,18 +239,18 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
   const filtered = studentsSnap.docs.filter((doc) => {
     const data = doc.data();
     if (subset === "All") return true;
-    const class_year = data.class_year;
+    const classYear = data.class_year;
     switch (subset) {
-      case "Freshmen":
-        return class_year === 2028;
-      case "Sophomores":
-        return class_year === 2027;
-      case "Juniors":
-        return class_year === 2026;
-      case "Seniors":
-        return class_year === 2025;
-      default:
-        return false;
+    case "Freshmen":
+      return classYear === 2028;
+    case "Sophomores":
+      return classYear === 2027;
+    case "Juniors":
+      return classYear === 2026;
+    case "Seniors":
+      return classYear === 2025;
+    default:
+      return false;
     }
   });
 
@@ -277,7 +277,7 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
     });
 
     if (!seenPairs.has(pairKey) && !alreadyInList) {
-      randomPairs.push({ entry1: i1, entry2: i2 });
+      randomPairs.push({entry1: i1, entry2: i2});
     }
 
     attempts++;
