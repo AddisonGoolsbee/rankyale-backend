@@ -7,7 +7,7 @@ initializeApp();
 const db = getFirestore();
 
 const K = 32; // Elo rating K-factor
-
+const MAX_DAILY_RANKINGS = 100;
 export const updateEloRating = onCall(async (request) => {
 
   const uid = request.auth?.uid;
@@ -116,4 +116,78 @@ export const getClassYear = onCall(async (request) => {
   const classYear = yaliesJSON[0].year;
 
   return { classYear };
+});
+
+export const fetchVotesAndGeneratePairs = onCall(async (request) => {
+  logger.info(request.data);
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new Error("Unauthenticated: Sign-in required");
+  }
+
+  const votesSnap = await db.collection("votes")
+    .where("uid", "==", uid)
+    .where("collection", "==", request.data.collection)
+    .get();
+
+  const seenPairs = new Set<string>();
+  votesSnap.forEach((doc) => {
+    const { entryA, entryB } = doc.data();
+    seenPairs.add(`${entryA}_${entryB}`);
+  });
+
+  // Fetch all student entries
+  const subset = request.data.subset || "All"; // Assuming subset is passed in request data
+  const studentsSnap = await db.collection("categories").doc(request.data.collection).collection("entries").get();
+
+  // Filter based on subset
+  const filtered = studentsSnap.docs.filter((doc) => {
+    const data = doc.data();
+    if (subset === "All") return true;
+    const class_year = data.class_year;
+    switch (subset) {
+      case "Freshmen":
+        return class_year === 2028;
+      case "Sophomores":
+        return class_year === 2027;
+      case "Juniors":
+        return class_year === 2026;
+      case "Seniors":
+        return class_year === 2025;
+      default:
+        return false;
+    }
+  });
+  logger.info(`Filtered length: ${filtered.length}`);
+
+  const randomPairs: { entry1: number; entry2: number }[] = [];
+  let attempts = 0;
+
+  while (randomPairs.length < MAX_DAILY_RANKINGS && attempts < 1000) {
+    const i1 = Math.floor(Math.random() * filtered.length);
+    let i2 = Math.floor(Math.random() * filtered.length);
+
+    while (i2 === i1) {
+      i2 = Math.floor(Math.random() * filtered.length);
+    }
+
+    const [idA, idB] = [filtered[i1].id, filtered[i2].id].sort();
+    const pairKey = `${idA}_${idB}`;
+
+    const alreadyInList = randomPairs.some((pair) => {
+      const [a, b] = [
+        filtered[pair.entry1].id,
+        filtered[pair.entry2].id,
+      ].sort();
+      return `${a}_${b}` === pairKey;
+    });
+
+    if (!seenPairs.has(pairKey) && !alreadyInList) {
+      randomPairs.push({ entry1: i1, entry2: i2 });
+    }
+
+    attempts++;
+  }
+  logger.info(`Generated ${randomPairs.length} pairs`);
+  return randomPairs;
 });
