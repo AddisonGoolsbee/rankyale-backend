@@ -1,4 +1,7 @@
 emulator-data/
+temp.*
+.venv/
+serviceAccountKey.json
 
 # Logs
 logs

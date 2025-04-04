@@ -101,6 +101,7 @@ export const updateEloRating = onCall(async (request) => {
       collection: collectionName,
       entryA: idA,
       entryB: idB,
+      winner: mode === 0 ? idA : idB,
       timestamp: new Date(),
     });
 
