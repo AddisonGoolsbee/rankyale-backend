@@ -6,6 +6,63 @@ import {getFirestore} from "firebase-admin/firestore";
 initializeApp();
 const db = getFirestore();
 
+const subcategories = ["All", "Freshmen", "Sophomores", "Juniors", "Seniors"];
+
+export const fetchTopEntries = onCall(async (request) => {
+  const collectionName = request.data.collection;
+  if (!collectionName) {
+    throw new Error("Missing collection name");
+  }
+
+  const results: Record<string, FirebaseFirestore.DocumentData[]> = {};
+
+  for (const sub of subcategories) {
+    let query = db.collection("categories")
+      .doc(collectionName)
+      .collection("entries")
+      .orderBy("score", "desc")
+      .limit(100);
+
+    if (sub !== "All") {
+      const classYear =
+        sub === "Freshmen" ? 2028 :
+          sub === "Sophomores" ? 2027 :
+            sub === "Juniors" ? 2026 :
+              sub === "Seniors" ? 2025 : null;
+
+      if (classYear) {
+        query = query.where("class_year", "==", classYear);
+      }
+    }
+
+    const snap = await query.get();
+    results[sub] = snap.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+  }
+
+  return results;
+});
+
+
+//   const collectionName = request.data.collection;
+//   const subset = request.data.subset;
+
+//   const studentsSnap = await db.collection("categories").doc(collectionName).collection("entries").get();
+//   const students = studentsSnap.docs.map((doc) => doc.data());
+
+//   const votesSnap = await db.collection("votes")
+//     .where("collection", "==", collectionName)
+//     .get();
+//   const votes = votesSnap.docs.map((doc) => doc.data());
+
+//   const pairs = [];
+//   for (const vote of votes) {
+//     const {entryA, entryB} = vote;
+//     pairs.push({entryA, entryB});
+//   }
+
+//   return {students, pairs};
+// });
+
 const K = 32; // Elo rating K-factor
 const MAX_DAILY_RANKINGS = 100;
 export const updateEloRating = onCall(async (request) => {
@@ -35,6 +92,10 @@ export const updateEloRating = onCall(async (request) => {
     const userData = userDoc.data();
     if (!userData) {
       return {message: "User data not found"};
+    }
+
+    if (userData.banned) {
+      return {message: "You are banned from ranking"};
     }
 
     const today = new Date().toISOString().split("T")[0];
