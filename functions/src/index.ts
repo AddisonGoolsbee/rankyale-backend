@@ -435,6 +435,11 @@ export const fetchRandomBuckets = onCall(async (request) => {
 });
 
 export const getEntriesFromPairs = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new Error("Unauthenticated: Sign-in required");
+  }
+
   const {collection, pairs} = request.data;
 
   if (!collection || !Array.isArray(pairs) || pairs.length !== 100) {
