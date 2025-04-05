@@ -75,9 +75,6 @@ export const generateBuckets = onCall(async (request) => {
   const batch = db.batch();
   const bucketsRef = db.collection("buckets");
 
-
-  const result: Record<string, string[][][]> = {};
-
   for (const [subcategory, filterFn] of Object.entries(subcategories)) {
     const pool = allStudents.filter(filterFn);
 
@@ -112,10 +109,6 @@ export const generateBuckets = onCall(async (request) => {
         console.log(`${subcategory} first 5 pairs:`, pairs.slice(0, 5));
       }
     }
-  }
-  // print out the first 5 from the first bucket for each subcategory
-  for (const sub of Object.keys(result)) {
-    console.log(result[sub][0].slice(0, 5));
   }
 
   await batch.commit();
@@ -266,34 +259,39 @@ export const getUser = onCall(async (request) => {
     throw new https.HttpsError("not-found", "User data not found");
   }
 
-  const apiKey = process.env.YALIES_API_KEY;
-  if (!apiKey) {
-    throw new https.HttpsError("internal", "Yalies API key not configured");
+  if (!userData.classYear) {
+    const apiKey = process.env.YALIES_API_KEY;
+    if (!apiKey) {
+      throw new https.HttpsError("internal", "Yalies API key not configured");
+    }
+
+    const yaliesURL = "https://api.yalies.io/v2/people";
+    const yaliesResponse = await fetch(yaliesURL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + apiKey,
+      },
+      body: JSON.stringify({filters: {email: email}}),
+    });
+
+    if (!yaliesResponse.ok) {
+      logger.error("Yalies API error:", await yaliesResponse.text());
+      throw new https.HttpsError("unavailable", "Failed to fetch Yalies data");
+    }
+
+    const yaliesJSON = await yaliesResponse.json();
+    const classYear = yaliesJSON[0].year;
+
+    // Update the user's class year
+    await userRef.update({classYear});
   }
-
-  const yaliesURL = "https://api.yalies.io/v2/people";
-  const yaliesResponse = await fetch(yaliesURL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + apiKey,
-    },
-    body: JSON.stringify({filters: {email: email}}),
-  });
-
-  if (!yaliesResponse.ok) {
-    logger.error("Yalies API error:", await yaliesResponse.text());
-    throw new https.HttpsError("unavailable", "Failed to fetch Yalies data");
-  }
-
-  const yaliesJSON = await yaliesResponse.json();
-  const classYear = yaliesJSON[0].year;
-
-  // Update the user's class year
-  await userRef.update({classYear});
 
   // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+
 
   // Initialize today's votes if not present
   if (!userData.votes.some((vote: any) => vote.date === today)) {
@@ -311,7 +309,7 @@ export const getUser = onCall(async (request) => {
   }
 
   const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
-  return {email, classYear, todaysVotes};
+  return {email, classYear: userData.classYear, todaysVotes};
 });
 
 export const fetchVotesAndGeneratePairs = onCall(async (request) => {
@@ -406,4 +404,32 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
     attempts++;
   }
   return randomPairs;
+});
+
+export const fetchRandomBuckets = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new Error("Unauthenticated: Sign-in required");
+  }
+
+  const collectionName = request.data.collection;
+  if (!collectionName) {
+    throw new Error("Missing collection name");
+  }
+
+  const subcategories = ["All", "Freshmen", "Sophomores", "Juniors", "Seniors"];
+  const result: Record<string, { a: string; b: string }[]> = {};
+
+  for (const sub of subcategories) {
+    const index = Math.floor(Math.random() * 100);
+    const bucketId = `${collectionName}_${sub}_${index}`;
+    const doc = await db.collection("buckets").doc(bucketId).get();
+    if (doc.exists) {
+      result[sub] = doc.data()?.pairs || [];
+    } else {
+      result[sub] = [];
+    }
+  }
+
+  return result;
 });
