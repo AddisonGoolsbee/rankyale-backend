@@ -10,7 +10,8 @@ const subcategories = ["All", "Freshmen", "Sophomores", "Juniors", "Seniors"];
 
 export const fetchTopEntries = onCall(async (request) => {
   const uid = request.auth?.uid;
-  if (!uid) {
+  const email = request.auth?.token?.email;
+  if (!uid || !email || !email.endsWith("@yale.edu")) {
     throw new Error("Unauthenticated: Sign-in required");
   }
 
@@ -120,7 +121,8 @@ const K = 32; // Elo rating K-factor
 const MAX_DAILY_RANKINGS = 100;
 export const updateEloRating = onCall(async (request) => {
   const uid = request.auth?.uid;
-  if (!uid) {
+  const email = request.auth?.token?.email;
+  if (!uid || !email || !email.endsWith("@yale.edu")) {
     throw new Error("Unauthenticated: Sign-in required");
   }
 
@@ -314,7 +316,8 @@ export const getUser = onCall(async (request) => {
 
 export const fetchVotesAndGeneratePairs = onCall(async (request) => {
   const uid = request.auth?.uid;
-  if (!uid) {
+  const email = request.auth?.token?.email;
+  if (!uid || !email || !email.endsWith("@yale.edu")) {
     throw new Error("Unauthenticated: Sign-in required");
   }
 
@@ -408,7 +411,8 @@ export const fetchVotesAndGeneratePairs = onCall(async (request) => {
 
 export const fetchRandomBuckets = onCall(async (request) => {
   const uid = request.auth?.uid;
-  if (!uid) {
+  const email = request.auth?.token?.email;
+  if (!uid || !email || !email.endsWith("@yale.edu")) {
     throw new Error("Unauthenticated: Sign-in required");
   }
 
@@ -436,7 +440,8 @@ export const fetchRandomBuckets = onCall(async (request) => {
 
 export const getEntriesFromPairs = onCall(async (request) => {
   const uid = request.auth?.uid;
-  if (!uid) {
+  const email = request.auth?.token?.email;
+  if (!uid || !email || !email.endsWith("@yale.edu")) {
     throw new Error("Unauthenticated: Sign-in required");
   }
 
