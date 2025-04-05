@@ -433,3 +433,26 @@ export const fetchRandomBuckets = onCall(async (request) => {
 
   return result;
 });
+
+export const getEntriesFromPairs = onCall(async (request) => {
+  const {collection, pairs} = request.data;
+
+  if (!collection || !Array.isArray(pairs) || pairs.length !== 100) {
+    throw new Error("Missing or invalid parameters");
+  }
+
+  const ids = Array.from(
+    new Set(pairs.flatMap(({a, b}: { a: string; b: string }) => [a, b]))
+  );
+
+  const refs = ids.map((id) =>
+    db.collection("categories").doc(collection).collection("entries").doc(id)
+  );
+
+  const docs = await Promise.all(refs.map((ref) => ref.get()));
+  const entries = Object.fromEntries(
+    docs.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()])
+  );
+
+  return entries;
+});
