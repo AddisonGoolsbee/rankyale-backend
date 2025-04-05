@@ -311,7 +311,7 @@ export const getUser = onCall(async (request) => {
   }
 
   const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
-  return {email, classYear: userData.classYear, todaysVotes};
+  return {email, classYear: userData.classYear, todaysVotes, banned: userData.banned ?? false};
 });
 
 export const fetchVotesAndGeneratePairs = onCall(async (request) => {
@@ -465,4 +465,27 @@ export const getEntriesFromPairs = onCall(async (request) => {
   );
 
   return entries;
+});
+
+export const optOut = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  const email = request.auth?.token?.email;
+
+  if (!uid || !email || !email.endsWith("@yale.edu")) {
+    throw new Error("Unauthenticated or unauthorized");
+  }
+
+  const userRef = db.collection("users").doc(uid);
+  const entryRef = db
+    .collection("categories")
+    .doc("students")
+    .collection("entries")
+    .doc(email);
+
+  await Promise.all([
+    userRef.update({banned: true}),
+    entryRef.delete(),
+  ]);
+
+  return {message: "User opted out and entry removed."};
 });
