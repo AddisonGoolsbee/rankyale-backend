@@ -9,6 +9,11 @@ const db = getFirestore();
 const subcategories = ["All", "Freshmen", "Sophomores", "Juniors", "Seniors"];
 
 export const fetchTopEntries = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new Error("Unauthenticated: Sign-in required");
+  }
+
   const collectionName = request.data.collection;
   if (!collectionName) {
     throw new Error("Missing collection name");
@@ -42,26 +47,81 @@ export const fetchTopEntries = onCall(async (request) => {
   return results;
 });
 
+export const generateBuckets = onCall(async (request) => {
+  const collectionName = request.data.collection;
+  if (!collectionName) {
+    throw new Error("Missing collection name");
+  }
 
-//   const collectionName = request.data.collection;
-//   const subset = request.data.subset;
+  const subcategories = {
+    All: () => true,
+    Seniors: (s: any) => s.class_year === 2025,
+    Juniors: (s: any) => s.class_year === 2026,
+    Sophomores: (s: any) => s.class_year === 2027,
+    Freshmen: (s: any) => s.class_year === 2028,
+  };
 
-//   const studentsSnap = await db.collection("categories").doc(collectionName).collection("entries").get();
-//   const students = studentsSnap.docs.map((doc) => doc.data());
+  const studentsSnap = await db
+    .collection("categories")
+    .doc(collectionName)
+    .collection("entries")
+    .get();
 
-//   const votesSnap = await db.collection("votes")
-//     .where("collection", "==", collectionName)
-//     .get();
-//   const votes = votesSnap.docs.map((doc) => doc.data());
+  const allStudents = studentsSnap.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  }));
 
-//   const pairs = [];
-//   for (const vote of votes) {
-//     const {entryA, entryB} = vote;
-//     pairs.push({entryA, entryB});
-//   }
+  const batch = db.batch();
+  const bucketsRef = db.collection("buckets");
 
-//   return {students, pairs};
-// });
+
+  const result: Record<string, string[][][]> = {};
+
+  for (const [subcategory, filterFn] of Object.entries(subcategories)) {
+    const pool = allStudents.filter(filterFn);
+
+    for (let index = 0; index < 100; index++) {
+      const pairs: string[][] = [];
+      const seen = new Set<string>();
+
+      while (pairs.length < 100 && pool.length >= 2) {
+        const i1 = Math.floor(Math.random() * pool.length);
+        let i2 = Math.floor(Math.random() * pool.length);
+        while (i2 === i1) i2 = Math.floor(Math.random() * pool.length);
+
+        const [idA, idB] = [pool[i1].id, pool[i2].id].sort();
+        const key = `${idA}_${idB}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          pairs.push([idA, idB]);
+        }
+      }
+
+      const bucketId = `${collectionName}_${subcategory}_${index}`;
+      const bucketDoc = bucketsRef.doc(bucketId);
+      batch.set(bucketDoc, {
+        collection: collectionName,
+        subcategory,
+        index,
+        pairs: pairs.map(([a, b]) => ({a, b})),
+        timestamp: new Date(),
+      });
+
+      if (index === 0) {
+        console.log(`${subcategory} first 5 pairs:`, pairs.slice(0, 5));
+      }
+    }
+  }
+  // print out the first 5 from the first bucket for each subcategory
+  for (const sub of Object.keys(result)) {
+    console.log(result[sub][0].slice(0, 5));
+  }
+
+  await batch.commit();
+  return {message: "Buckets generated and written to Firestore."};
+});
+
 
 const K = 32; // Elo rating K-factor
 const MAX_DAILY_RANKINGS = 100;
