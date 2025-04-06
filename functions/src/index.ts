@@ -153,21 +153,27 @@ export const updateEloRating = onCall(async (request) => {
       return {message: "You are banned from ranking"};
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/New_York",
+    });
 
     // Initialize today's votes if not present
-    if (!userData.votes.some((vote: any) => vote.date === today)) {
-      userData.votes.push({
+    const votes = userData.votes ?? [];
+
+    let todaysVotes = votes.find((v: any) => v.date === today);
+
+    if (!todaysVotes) {
+      todaysVotes = {
         date: today,
         All: 0,
         Freshmen: 0,
         Sophomores: 0,
         Juniors: 0,
         Seniors: 0,
-      });
+      };
+      votes.push(todaysVotes);
     }
 
-    const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
     if (todaysVotes[subcategory] >= MAX_DAILY_RANKINGS) {
       return {message: "No votes left for this category today"};
     }
@@ -223,7 +229,7 @@ export const updateEloRating = onCall(async (request) => {
 
     // Update the votes count
     todaysVotes[subcategory] += 1;
-    transaction.update(userRef, {votes: userData.votes});
+    transaction.update(userRef, {votes});
 
     return {message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid};
   });
@@ -312,101 +318,6 @@ export const getUser = onCall(async (request) => {
 
   const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
   return {email, classYear: userData.classYear, todaysVotes, banned: userData.banned ?? false};
-});
-
-export const fetchVotesAndGeneratePairs = onCall(async (request) => {
-  const uid = request.auth?.uid;
-  const email = request.auth?.token?.email;
-  if (!uid || !email || !email.endsWith("@yale.edu")) {
-    throw new Error("Unauthenticated: Sign-in required");
-  }
-
-  const userRef = db.collection("users").doc(uid);
-  const userDoc = await userRef.get();
-
-  if (!userDoc.exists) {
-    throw new Error("User not found");
-  }
-
-  const userData = userDoc.data();
-  if (!userData) {
-    throw new Error("User data not found");
-  }
-
-  const today = new Date().toISOString().split("T")[0];
-  const todaysVotes = userData.votes.find((vote: any) => vote.date === today);
-
-  if (!todaysVotes) {
-    return [];
-  }
-
-  const subset = request.data.subset || "All";
-  const remainingVotes = MAX_DAILY_RANKINGS - (todaysVotes[subset] || 0);
-
-  if (remainingVotes <= 0) {
-    return [];
-  }
-
-  const votesSnap = await db.collection("votes")
-    .where("uid", "==", uid)
-    .where("collection", "==", request.data.collection)
-    .get();
-
-  const seenPairs = new Set<string>();
-  votesSnap.forEach((doc) => {
-    const {entryA, entryB} = doc.data();
-    seenPairs.add(`${entryA}_${entryB}`);
-  });
-
-  const studentsSnap = await db.collection("categories").doc(request.data.collection).collection("entries").get();
-
-  const filtered = studentsSnap.docs.filter((doc) => {
-    const data = doc.data();
-    if (subset === "All") return true;
-    const classYear = data.class_year;
-    switch (subset) {
-    case "Freshmen":
-      return classYear === 2028;
-    case "Sophomores":
-      return classYear === 2027;
-    case "Juniors":
-      return classYear === 2026;
-    case "Seniors":
-      return classYear === 2025;
-    default:
-      return false;
-    }
-  });
-
-  const randomPairs: { entry1: number; entry2: number }[] = [];
-  let attempts = 0;
-
-  while (randomPairs.length < remainingVotes && attempts < 1000) {
-    const i1 = Math.floor(Math.random() * filtered.length);
-    let i2 = Math.floor(Math.random() * filtered.length);
-
-    while (i2 === i1) {
-      i2 = Math.floor(Math.random() * filtered.length);
-    }
-
-    const [idA, idB] = [filtered[i1].id, filtered[i2].id].sort();
-    const pairKey = `${idA}_${idB}`;
-
-    const alreadyInList = randomPairs.some((pair) => {
-      const [a, b] = [
-        filtered[pair.entry1].id,
-        filtered[pair.entry2].id,
-      ].sort();
-      return `${a}_${b}` === pairKey;
-    });
-
-    if (!seenPairs.has(pairKey) && !alreadyInList) {
-      randomPairs.push({entry1: i1, entry2: i2});
-    }
-
-    attempts++;
-  }
-  return randomPairs;
 });
 
 export const fetchRandomBuckets = onCall(async (request) => {
