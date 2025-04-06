@@ -371,11 +371,29 @@ export const getEntriesFromPairs = onCall(async (request) => {
   );
 
   const docs = await Promise.all(refs.map((ref) => ref.get()));
-  const entries = Object.fromEntries(
+  const entriesMap = Object.fromEntries(
     docs.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()])
   );
 
-  return entries;
+  // fallback logic for missing entries
+  for (const {a, b} of pairs) {
+    if (!entriesMap[a]) {
+      const candidates = ids.filter((id) => id !== b && entriesMap[id]);
+      if (candidates.length > 0) {
+        const replacement = candidates[Math.floor(Math.random() * candidates.length)];
+        entriesMap[a] = entriesMap[replacement];
+      }
+    }
+    if (!entriesMap[b]) {
+      const candidates = ids.filter((id) => id !== a && entriesMap[id]);
+      if (candidates.length > 0) {
+        const replacement = candidates[Math.floor(Math.random() * candidates.length)];
+        entriesMap[b] = entriesMap[replacement];
+      }
+    }
+  }
+
+  return entriesMap;
 });
 
 export const optOut = onCall(async (request) => {
