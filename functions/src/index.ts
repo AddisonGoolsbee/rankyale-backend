@@ -73,7 +73,6 @@ export const generateBuckets = onCall(async (request) => {
     ...doc.data(),
   }));
 
-  const batch = db.batch();
   const bucketsRef = db.collection("buckets");
 
   for (const [subcategory, filterFn] of Object.entries(subcategories)) {
@@ -98,7 +97,7 @@ export const generateBuckets = onCall(async (request) => {
 
       const bucketId = `${collectionName}_${subcategory}_${index}`;
       const bucketDoc = bucketsRef.doc(bucketId);
-      batch.set(bucketDoc, {
+      await bucketDoc.set({
         collection: collectionName,
         subcategory,
         index,
@@ -112,7 +111,6 @@ export const generateBuckets = onCall(async (request) => {
     }
   }
 
-  await batch.commit();
   return {message: "Buckets generated and written to Firestore."};
 });
 
@@ -197,6 +195,8 @@ export const updateEloRating = onCall(async (request) => {
     const voteRef = db.collection("votes").doc(voteId);
     const existingVote = await transaction.get(voteRef);
     if (existingVote.exists) {
+      todaysVotes[subcategory] += 1;
+      transaction.update(userRef, {votes});
       return {message: "You've already ranked this pair."};
     }
 
