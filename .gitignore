@@ -2,6 +2,7 @@ emulator-data/
 temp.*
 .venv/
 serviceAccountKey.json
+top_entries.json
 
 # Logs
 logs
