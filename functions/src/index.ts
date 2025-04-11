@@ -115,124 +115,126 @@ export const generateBuckets = onCall(async (request) => {
 });
 
 
-const K = 32; // Elo rating K-factor
-const MAX_DAILY_RANKINGS = 100;
+// const K = 32; // Elo rating K-factor
+// const MAX_DAILY_RANKINGS = 100;
 export const updateEloRating = onCall(async (request) => {
-  const uid = request.auth?.uid;
-  const email = request.auth?.token?.email;
-  if (!uid || !email || !email.endsWith("@yale.edu")) {
-    throw new Error("Unauthenticated: Sign-in required");
-  }
+  return {message: "Ranking is disabled"};
 
-  const {collectionName, entry1Id, entry2Id, mode, subcategory} = request.data;
+  // const uid = request.auth?.uid;
+  // const email = request.auth?.token?.email;
+  // if (!uid || !email || !email.endsWith("@yale.edu")) {
+  //   throw new Error("Unauthenticated: Sign-in required");
+  // }
 
-  if (!collectionName || !entry1Id || !entry2Id || !subcategory) {
-    throw new Error("Invalid request: Missing parameters");
-  }
+  // const {collectionName, entry1Id, entry2Id, mode, subcategory} = request.data;
 
-  const userRef = db.collection("users").doc(uid);
-  const entry1Ref = db.collection("categories").doc(collectionName).collection("entries").doc(entry1Id);
-  const entry2Ref = db.collection("categories").doc(collectionName).collection("entries").doc(entry2Id);
+  // if (!collectionName || !entry1Id || !entry2Id || !subcategory) {
+  //   throw new Error("Invalid request: Missing parameters");
+  // }
 
-  let score1; let score2; // Declare score1 and score2 here
+  // const userRef = db.collection("users").doc(uid);
+  // const entry1Ref = db.collection("categories").doc(collectionName).collection("entries").doc(entry1Id);
+  // const entry2Ref = db.collection("categories").doc(collectionName).collection("entries").doc(entry2Id);
 
-  await db.runTransaction(async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists) {
-      return {message: "User not found"};
-    }
+  // let score1; let score2; // Declare score1 and score2 here
 
-    const userData = userDoc.data();
-    if (!userData) {
-      return {message: "User data not found"};
-    }
+  // await db.runTransaction(async (transaction) => {
+  //   const userDoc = await transaction.get(userRef);
+  //   if (!userDoc.exists) {
+  //     return {message: "User not found"};
+  //   }
 
-    if (userData.banned) {
-      return {message: "You are banned from ranking"};
-    }
+  //   const userData = userDoc.data();
+  //   if (!userData) {
+  //     return {message: "User data not found"};
+  //   }
 
-    const today = new Date().toLocaleDateString("en-CA", {
-      timeZone: "America/New_York",
-    });
+  //   if (userData.banned) {
+  //     return {message: "You are banned from ranking"};
+  //   }
 
-    // Initialize today's votes if not present
-    const votes = userData.votes ?? [];
+  //   const today = new Date().toLocaleDateString("en-CA", {
+  //     timeZone: "America/New_York",
+  //   });
 
-    let todaysVotes = votes.find((v: any) => v.date === today);
+  //   // Initialize today's votes if not present
+  //   const votes = userData.votes ?? [];
 
-    if (!todaysVotes) {
-      todaysVotes = {
-        date: today,
-        All: 0,
-        Freshmen: 0,
-        Sophomores: 0,
-        Juniors: 0,
-        Seniors: 0,
-      };
-      votes.push(todaysVotes);
-    }
+  //   let todaysVotes = votes.find((v: any) => v.date === today);
 
-    if (todaysVotes[subcategory] >= MAX_DAILY_RANKINGS) {
-      return {message: "No votes left for this category today"};
-    }
+  //   if (!todaysVotes) {
+  //     todaysVotes = {
+  //       date: today,
+  //       All: 0,
+  //       Freshmen: 0,
+  //       Sophomores: 0,
+  //       Juniors: 0,
+  //       Seniors: 0,
+  //     };
+  //     votes.push(todaysVotes);
+  //   }
 
-    const [entry1Doc, entry2Doc] = await Promise.all([transaction.get(entry1Ref), transaction.get(entry2Ref)]);
+  //   if (todaysVotes[subcategory] >= MAX_DAILY_RANKINGS) {
+  //     return {message: "No votes left for this category today"};
+  //   }
 
-    if (!entry1Doc.exists || !entry2Doc.exists) {
-      return {message: "One or both entries not found"};
-    }
+  //   const [entry1Doc, entry2Doc] = await Promise.all([transaction.get(entry1Ref), transaction.get(entry2Ref)]);
 
-    const entry1 = entry1Doc.data();
-    const entry2 = entry2Doc.data();
+  //   if (!entry1Doc.exists || !entry2Doc.exists) {
+  //     return {message: "One or both entries not found"};
+  //   }
 
-    if (entry1 === undefined || entry2 === undefined) {
-      return {message: "One or both entries do not have a score"};
-    }
+  //   const entry1 = entry1Doc.data();
+  //   const entry2 = entry2Doc.data();
 
-    const [idA, idB] = [entry1Id, entry2Id].sort(); // normalize
-    const voteId = `${uid}_${collectionName}_${idA}_${idB}`;
+  //   if (entry1 === undefined || entry2 === undefined) {
+  //     return {message: "One or both entries do not have a score"};
+  //   }
 
-    const voteRef = db.collection("votes").doc(voteId);
-    const existingVote = await transaction.get(voteRef);
-    if (existingVote.exists) {
-      todaysVotes[subcategory] += 1;
-      transaction.update(userRef, {votes});
-      return {message: "You've already ranked this pair."};
-    }
+  //   const [idA, idB] = [entry1Id, entry2Id].sort(); // normalize
+  //   const voteId = `${uid}_${collectionName}_${idA}_${idB}`;
 
-    const randomFactor = 0.01 * (Math.random() - 0.5); // Small random factor between -0.005 and 0.005
-    const expectedScore1 = 1 / (1 + Math.pow(10, (entry2.score - entry1.score) / 400 + randomFactor));
-    const expectedScore2 = 1 / (1 + Math.pow(10, (entry1.score - entry2.score) / 400 + randomFactor));
+  //   const voteRef = db.collection("votes").doc(voteId);
+  //   const existingVote = await transaction.get(voteRef);
+  //   if (existingVote.exists) {
+  //     todaysVotes[subcategory] += 1;
+  //     transaction.update(userRef, {votes});
+  //     return {message: "You've already ranked this pair."};
+  //   }
 
-    score1 = entry1.score;
-    score2 = entry2.score;
+  //   const randomFactor = 0.01 * (Math.random() - 0.5); // Small random factor between -0.005 and 0.005
+  //   const expectedScore1 = 1 / (1 + Math.pow(10, (entry2.score - entry1.score) / 400 + randomFactor));
+  //   const expectedScore2 = 1 / (1 + Math.pow(10, (entry1.score - entry2.score) / 400 + randomFactor));
 
-    if (mode === 0) {
-      score1 += K * (1 - expectedScore1);
-      score2 += K * (0 - expectedScore2);
-    } else if (mode === 1) {
-      score1 += K * (0 - expectedScore1);
-      score2 += K * (1 - expectedScore2);
-    }
+  //   score1 = entry1.score;
+  //   score2 = entry2.score;
 
-    transaction.update(entry1Ref, {score: score1});
-    transaction.update(entry2Ref, {score: score2});
+  //   if (mode === 0) {
+  //     score1 += K * (1 - expectedScore1);
+  //     score2 += K * (0 - expectedScore2);
+  //   } else if (mode === 1) {
+  //     score1 += K * (0 - expectedScore1);
+  //     score2 += K * (1 - expectedScore2);
+  //   }
 
-    transaction.set(voteRef, {
-      uid,
-      collection: collectionName,
-      entryA: idA,
-      entryB: idB,
-      winner: mode === 0 ? idA : idB,
-      timestamp: new Date(),
-    });
+  //   transaction.update(entry1Ref, {score: score1});
+  //   transaction.update(entry2Ref, {score: score2});
 
-    // Update the votes count
-    todaysVotes[subcategory] += 1;
-    transaction.update(userRef, {votes});
+  //   transaction.set(voteRef, {
+  //     uid,
+  //     collection: collectionName,
+  //     entryA: idA,
+  //     entryB: idB,
+  //     winner: mode === 0 ? idA : idB,
+  //     timestamp: new Date(),
+  //   });
 
-    return {message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid};
-  });
+  //   // Update the votes count
+  //   todaysVotes[subcategory] += 1;
+  //   transaction.update(userRef, {votes});
+
+  //   return {message: "Elo scores updated", entry1Id, newScore1: score1, entry2Id, newScore2: score2, by: uid};
+  // });
 });
 
 export const getUser = onCall(async (request) => {
@@ -350,50 +352,52 @@ export const fetchRandomBuckets = onCall(async (request) => {
 });
 
 export const getEntriesFromPairs = onCall(async (request) => {
-  const uid = request.auth?.uid;
-  const email = request.auth?.token?.email;
-  if (!uid || !email || !email.endsWith("@yale.edu")) {
-    throw new Error("Unauthenticated: Sign-in required");
-  }
+  return {message: "Ranking is disabled"};
 
-  const {collection, pairs} = request.data;
+  // const uid = request.auth?.uid;
+  // const email = request.auth?.token?.email;
+  // if (!uid || !email || !email.endsWith("@yale.edu")) {
+  //   throw new Error("Unauthenticated: Sign-in required");
+  // }
 
-  if (!collection || !Array.isArray(pairs) || pairs.length !== 100) {
-    throw new Error("Missing or invalid parameters");
-  }
+  // const {collection, pairs} = request.data;
 
-  const ids = Array.from(
-    new Set(pairs.flatMap(({a, b}: { a: string; b: string }) => [a, b]))
-  );
+  // if (!collection || !Array.isArray(pairs) || pairs.length !== 100) {
+  //   throw new Error("Missing or invalid parameters");
+  // }
 
-  const refs = ids.map((id) =>
-    db.collection("categories").doc(collection).collection("entries").doc(id)
-  );
+  // const ids = Array.from(
+  //   new Set(pairs.flatMap(({a, b}: { a: string; b: string }) => [a, b]))
+  // );
 
-  const docs = await Promise.all(refs.map((ref) => ref.get()));
-  const entriesMap = Object.fromEntries(
-    docs.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()])
-  );
+  // const refs = ids.map((id) =>
+  //   db.collection("categories").doc(collection).collection("entries").doc(id)
+  // );
 
-  // fallback logic for missing entries
-  for (const {a, b} of pairs) {
-    if (!entriesMap[a]) {
-      const candidates = ids.filter((id) => id !== b && entriesMap[id]);
-      if (candidates.length > 0) {
-        const replacement = candidates[Math.floor(Math.random() * candidates.length)];
-        entriesMap[a] = entriesMap[replacement];
-      }
-    }
-    if (!entriesMap[b]) {
-      const candidates = ids.filter((id) => id !== a && entriesMap[id]);
-      if (candidates.length > 0) {
-        const replacement = candidates[Math.floor(Math.random() * candidates.length)];
-        entriesMap[b] = entriesMap[replacement];
-      }
-    }
-  }
+  // const docs = await Promise.all(refs.map((ref) => ref.get()));
+  // const entriesMap = Object.fromEntries(
+  //   docs.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data()])
+  // );
 
-  return entriesMap;
+  // // fallback logic for missing entries
+  // for (const {a, b} of pairs) {
+  //   if (!entriesMap[a]) {
+  //     const candidates = ids.filter((id) => id !== b && entriesMap[id]);
+  //     if (candidates.length > 0) {
+  //       const replacement = candidates[Math.floor(Math.random() * candidates.length)];
+  //       entriesMap[a] = entriesMap[replacement];
+  //     }
+  //   }
+  //   if (!entriesMap[b]) {
+  //     const candidates = ids.filter((id) => id !== a && entriesMap[id]);
+  //     if (candidates.length > 0) {
+  //       const replacement = candidates[Math.floor(Math.random() * candidates.length)];
+  //       entriesMap[b] = entriesMap[replacement];
+  //     }
+  //   }
+  // }
+
+  // return entriesMap;
 });
 
 export const optOut = onCall(async (request) => {
